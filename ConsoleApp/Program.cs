@@ -18,24 +18,15 @@ namespace ConsoleApp
                                         ?? "mongodb://localhost:27017?maxConnecting=100";
             var mongoClient = new MongoClient(mongoConnectionString);
             var db = mongoClient.GetDatabase("game");
-
-            db.DropCollection(MongoUserRepository.CollectionName);
+            
             userRepo = new MongoUserRepository(db);
-            gameRepo = new InMemoryGameRepository();
+            gameRepo = new MongoGameRepository(db);
             gameTurnRepo = new MongoGameTurnRepository(db);
         }
 
         public static void Main(string[] args)
         {
             new Program(args).RunMenuLoop();
-        }
-
-        public static IMongoDatabase Create()
-        {
-            var mongoConnectionString = Environment.GetEnvironmentVariable("PROJECT5100_MONGO_CONNECTION_STRING")
-                                        ?? "mongodb://localhost:27017?maxConnecting=100";
-            var mongoClient = new MongoClient(mongoConnectionString);
-            return mongoClient.GetDatabase("game-tests");
         }
 
         private void RunMenuLoop()
