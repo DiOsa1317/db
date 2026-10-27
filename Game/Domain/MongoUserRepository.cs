@@ -11,35 +11,46 @@ namespace Game.Domain
         public MongoUserRepository(IMongoDatabase database)
         {
             userCollection = database.GetCollection<UserEntity>(CollectionName);
+            var indexModel = new CreateIndexModel<UserEntity>(
+                Builders<UserEntity>.IndexKeys.Ascending(x => x.Login),
+                new CreateIndexOptions { Unique = true }
+            );
+            userCollection.Indexes.CreateOne(indexModel);
         }
 
         public UserEntity Insert(UserEntity user)
         {
             //TODO: Ищи в документации InsertXXX.
-            throw new NotImplementedException();
+            userCollection.InsertOne(user);
+            return user;
         }
 
         public UserEntity FindById(Guid id)
         {
             //TODO: Ищи в документации FindXXX
-            throw new NotImplementedException();
+            return userCollection.Find(x => x.Id == id).FirstOrDefault();
         }
 
         public UserEntity GetOrCreateByLogin(string login)
         {
             //TODO: Это Find или Insert
-            throw new NotImplementedException();
+            var foundByLogin =  userCollection.Find(x => x.Login == login).FirstOrDefault();
+            if (foundByLogin != null)
+                return foundByLogin;
+            var newUser = new UserEntity {Login = login};
+            userCollection.InsertOne(newUser);
+            return newUser;
         }
 
         public void Update(UserEntity user)
         {
             //TODO: Ищи в документации ReplaceXXX
-            throw new NotImplementedException();
+            userCollection.ReplaceOne(x => x.Id == user.Id, user);
         }
 
         public void Delete(Guid id)
         {
-            throw new NotImplementedException();
+            userCollection.DeleteOne(x => x.Id == id);
         }
 
         // Для вывода списка всех пользователей (упорядоченных по логину)
@@ -47,7 +58,15 @@ namespace Game.Domain
         public PageList<UserEntity> GetPage(int pageNumber, int pageSize)
         {
             //TODO: Тебе понадобятся SortBy, Skip и Limit
-            throw new NotImplementedException();
+            var totalCount = userCollection.CountDocuments(FilterDefinition<UserEntity>.Empty);
+            
+            var users = userCollection.Find(FilterDefinition<UserEntity>.Empty)
+                .SortBy(x => x.Login)
+                .Skip((pageNumber - 1) * pageSize)
+                .Limit(pageSize)
+                .ToList();
+                
+            return new PageList<UserEntity>(users, totalCount, pageNumber, pageSize);
         }
 
         // Не нужно реализовывать этот метод

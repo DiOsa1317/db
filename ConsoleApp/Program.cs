@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Game.Domain;
+using MongoDB.Driver;
 
 namespace ConsoleApp
 {
@@ -12,13 +13,23 @@ namespace ConsoleApp
 
         private Program(string[] args)
         {
-            userRepo = new InMemoryUserRepository();
+            var db = Create();
+            db.DropCollection(MongoUserRepository.CollectionName);
+            userRepo = new MongoUserRepository(db);
             gameRepo = new InMemoryGameRepository();
         }
 
         public static void Main(string[] args)
         {
             new Program(args).RunMenuLoop();
+        }
+        
+        public static IMongoDatabase Create()
+        {
+            var mongoConnectionString = Environment.GetEnvironmentVariable("PROJECT5100_MONGO_CONNECTION_STRING")
+                                        ?? "mongodb://localhost:27017?maxConnecting=100";
+            var mongoClient = new MongoClient(mongoConnectionString);
+            return mongoClient.GetDatabase("game-tests");
         }
 
         private void RunMenuLoop()
