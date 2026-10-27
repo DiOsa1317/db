@@ -9,21 +9,27 @@ namespace ConsoleApp
     {
         private readonly IUserRepository userRepo;
         private readonly IGameRepository gameRepo;
+        private readonly IGameTurnRepository gameTurnRepo;
         private readonly Random random = new Random();
 
         private Program(string[] args)
         {
-            var db = Create();
+            var mongoConnectionString = Environment.GetEnvironmentVariable("PROJECT5100_MONGO_CONNECTION_STRING")
+                                        ?? "mongodb://localhost:27017?maxConnecting=100";
+            var mongoClient = new MongoClient(mongoConnectionString);
+            var db = mongoClient.GetDatabase("game");
+
             db.DropCollection(MongoUserRepository.CollectionName);
             userRepo = new MongoUserRepository(db);
             gameRepo = new InMemoryGameRepository();
+            gameTurnRepo = new MongoGameTurnRepository(db);
         }
 
         public static void Main(string[] args)
         {
             new Program(args).RunMenuLoop();
         }
-        
+
         public static IMongoDatabase Create()
         {
             var mongoConnectionString = Environment.GetEnvironmentVariable("PROJECT5100_MONGO_CONNECTION_STRING")
@@ -136,8 +142,8 @@ namespace ConsoleApp
 
             if (game.HaveDecisionOfEveryPlayer)
             {
-                // TODO: Сохранить информацию о прошедшем туре в IGameTurnRepository. Сформировать информацию о закончившемся туре внутри FinishTurn и вернуть её сюда.
-                game.FinishTurn();
+                var turn = game.FinishTurn();
+                gameTurnRepo.Insert(turn);
             }
 
             ShowScore(game);
@@ -191,7 +197,30 @@ namespace ConsoleApp
         private void ShowScore(GameEntity game)
         {
             var players = game.Players;
-            // TODO: Показать информацию про 5 последних туров: кто как ходил и кто в итоге выиграл. Прочитать эту информацию из IGameTurnRepository
+            Console.WriteLine($"Score: {players[0].Name} {players[0].Score} : {players[1].Score} {players[1].Name}");
+
+            var lastTurns = gameTurnRepo.FindLastTurns(game.Id, 5);
+            if (lastTurns.Count > 0)
+            {
+                Console.WriteLine("\n--- Последние туры ---");
+                foreach (var turn in lastTurns.Reverse())
+                {
+                    var p1 = turn.Decisions[0];
+                    var p2 = turn.Decisions[1];
+
+                    string winnerText;
+                    if (turn.WinnerId == Guid.Empty)
+                        winnerText = "Ничья";
+                    else
+                    {
+                        var winner = turn.Decisions.FirstOrDefault(d => d.UserId == turn.WinnerId);
+                        winnerText = $"Победил {winner?.UserName ?? "Неизвестный"}";
+                    }
+
+                    Console.WriteLine($"Тур {turn.TurnIndex + 1}: {p1.UserName} ({p1.Decision}) vs {p2.UserName} ({p2.Decision}) -> {winnerText}");
+                }
+                Console.WriteLine("----------------------\n");
+            }
             Console.WriteLine($"Score: {players[0].Name} {players[0].Score} : {players[1].Score} {players[1].Name}");
         }
     }
